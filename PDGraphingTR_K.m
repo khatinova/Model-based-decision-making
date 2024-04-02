@@ -13,12 +13,11 @@ conmap=[result.trans]';
 correct =[result.correct]';
 startTP = [result.startTransferChoice];
 endTP = [result.endTransferChoice];
-normratings = [result.zRating]';
+normratings = [result.Rating]';
 SubjectID = result.ID;
 subjectID = repelem(SubjectID, length(c1), 1);
 trial = (1:length(c1))';
-Ratings = [result.Rating]';
-LearningEffect = [result.LearningEffect]; 
+ratings = [result.Rating]';
 medication= repelem(result.Med, length(c1), 1);
 disease = repelem(result.Dis, length(c1), 1);
 
@@ -128,6 +127,7 @@ next_rated_distance_unchosens = nan(length(c1), 1);
 seen_between_unchosen_ratings = nan(length(c1), 1);
 diffratings = nan(length(c1), 1);
 
+
 for i = 1:length(c1) % for each trial
     if isnan(c1(i)) % if there is no c1, make chosen shapes nan
         chosens(i) = nan;
@@ -195,8 +195,14 @@ for i = 1:length(c1) % for each trial
 
 end
 RatingsTable = table();
+ami = repelem(result.AMI, length(c1), 1);
+hads = repelem(result.HADS, length(c1), 1);
+updrs = repelem(result.UPDRST, length(c1), 1);
+age = repelem(result.Age, length(c1), 1);
+ratingschange = result.ratingschange_chosens';
+le = repelem(result.LearningEffect, length(c1), 1);
 
-RatingsTable = table(subjectID, trial, medication, disease, stick, win, con, chosens, unchosens, tp, normratings, ratingschange_chosens, ratingschange_unchosens,  ...
+RatingsTable = table(subjectID, trial, medication, disease, le, ami, hads, updrs, age, stick, win, con, chosens, unchosens, tp, ratings, normratings, ratingschange_chosens, ratingschange_unchosens,  ...
     diffratings, woncs, consiscs, wonus, consisucs, last_rated_distance_chosens, next_rated_distance_chosens, last_chosen_distance, last_unchosen_distance, ...
     last_rated_distance_unchosens, next_rated_distance_unchosens, seen_between_chosen_ratings);
 
