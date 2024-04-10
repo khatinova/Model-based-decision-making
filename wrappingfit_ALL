@@ -1,3 +1,11 @@
+% Set options
+optimize = 0; % Set if you wish to optimize free parameters
+GeneratePlots = 0; %If you want to generate figures
+GenerateSurrData = 0; %Do you want to generate surrogate data?
+GenerateCondPlots = 0;
+plotDawGraphs = 0;
+save = 0;
+
 %% Extracting variables from Gorilla files
 filenames= { 
 {
@@ -15,7 +23,7 @@ filenames= {
 {
 'C101.mat', 'C102.mat', 'C103.mat', 'C104.mat', 'C105.mat', 'C106.mat', 'C107.mat', ...
 'C108.mat', 'C109.mat', 'C110.mat', 'C111.mat', 'C112.mat', 'C113.mat', 'C114.mat',...
-'C115.mat', 'C116.mat', 'C117.mat', 'C118.mat' 'C119.mat'
+'C115.mat', 'C116.mat', 'C117.mat', 'C118.mat' 'C119.mat'...
 }
 {
 'HC101.mat', 'HC102.mat', 'HC103.mat', 'HC104.mat', 'HC105.mat', 'HC106.mat', 'HC107.mat', ...
@@ -30,9 +38,9 @@ filenames= {
 }
 };
 % initialize the combined group tables for a) trial-wise data (stick models) and b) ratingschange
-stayprobTable = table; HCstayprobTable = table; HCGroupData = [];
+stayprobTable = table; HCstayprobTable = table; HCGroupData = []; shortTable = table;
 
-for group = 5
+for group = 1:3
     GroupData = []; allratings = []; %figure %(for ratinsgchange subplot); %initialize structures and figures 
     for i = 1:length(filenames{group, 1}) % for the number of cells in filenames
         filename = filenames{group}{i}; %extract the filename corresponding to the current subject & group
@@ -73,7 +81,7 @@ for group = 5
             subjectData.LearningEffect = nan; % no learning effect, as they only did one session
             DemographicData = load("HCDemographicData.mat"); 
             subjectData.AMI = table2array(DemographicData.data(i,"AMITotal"));
-            subjectData.HADS = table2array(DemographicData.data(i,"HADSTotal"));
+            subjectData.HADS = table2array(DemographicData.data(i,"HADSTotal")); 
             subjectData.UPDRST = NaN;
             subjectData.Age = 1; %table2array(DemographicData.data(i, "Age"));
             subjectData.Sex = table2array(DemographicData.data(i,"Sex"));
@@ -87,10 +95,11 @@ for group = 5
             subjectData.Sex = NaN;
             subjectData.le = NaN;
         end
+        ami = subjectData.AMI; hads = subjectData.HADS; updrst = subjectData.UPDRST; age = subjectData.Age;
         subjectData.Med = Med;
         subjectData.Dis = Dis;
         % Extract variables for the current subject
-        subjectData.group = [group];
+        subjectData.group = group;
         subjectData.ID = i; % set subject ID to the current loop number
        
         if group == 3; subjectData.ID = i+18; 
@@ -133,43 +142,46 @@ for group = 5
             subjectData.rewprob = rewprobArray;       
             subjectData.Performance = sum(subjectData.R)/subjectData.Nch; % measure performance
     
+
             x = tiedrank(result.data.rating_Coord);% tiedrank the ratings to eliminate subject-specific ranges
             subjectData.zRating = x'; % x - nanmean(x(:,1:10),2); % remove the mean of the 1st 10 trials from the tiedranks
-            if result.data.nl_orientation == 1 % what orientation was the number line? (1 = vert, 0 = horizontal)
-                subjectData.Rating = (result.data.rating_Coord - 230)'; % subtract the value of coordinate at start of numberline
-            else; subjectData.Rating = (result.data.rating_Coord - 750)';
+            subjectData.nl_orientation = result.data.nl_orientation; nl = subjectData.nl_orientation(1); % what orientation was the number line? (1 = vert, 0 = horizontal)
+            if subjectData.nl_orientation == 1 % if vertical
+                subjectData.Rating = (600 - result.data.rating_Coord)'; % subtract the x-coordinate rating from the max x-coordinate rating
+            elseif subjectData.nl_orientation == 0 
+                subjectData.Rating = (result.data.rating_Coord - 700)';
             end
-            subjectData.Rating(subjectData.Rating < 0) = NaN; 
-            [diffratings, ratingschange_chosens, last_select_distance, last_rated_distance, wons,consis] = ratingschange_simple(subjectData);
-            subjectData.ratingschange_chosens = ratingschange_chosens;
+            subjectData.Rating(subjectData.Rating < 0 | subjectData.Rating > 550) = NaN;
+            x = tiedrank(subjectData.Rating - nanmean(subjectData.Rating(1:10))); % tiedrank & remove the mean of the 1st 10 trials from the tiedranks
+            subjectData.zRating = x;
+
+  
     
-            [pMB, pMF, pwin, barv, baraa, MBMFD, subjectTable, pMTbA, pMFbA, pMBTPOSA, pMBNEG, ...
-            RTTP, baraaq, ratingschange_chosens] = PDGraphingTR_K(subjectData, i);
+           [var, subjectTable, ratingschange_chosens] = PDGraphingTR_K(subjectData);
            % PD Graphing - calculates model-based and model-free behaviour for
            % a) choices 
            % b) ratings
            % c) makes a trialwise table (subjectTable) that has stick probability trial 2:end, based on 
            % consistency, reward, correct, trial + subject ID
-            [diffratings, ratingschange_chosens, last_select_distance, last_rated_distance, wons,consis] = ratingschange_simple(subjectData);
-
+       
             % Add the Graphing variables to subjectData
-            subjectData.pMB = pMB;
-            subjectData.pMF = pMF;
-            subjectData.pMTbA = pMTbA; % model based value transfer (based on last choice of current rated shape win/common)
-            subjectData.pMFbA = pMFbA; % model free value transfer (based on last choice of current rated shape win/common)
+            subjectData.pMB = var.pMB;
+            subjectData.pMF = var.pMF;
+            subjectData.pMTbA = var.pMTbA; % model based value transfer (based on last choice of current rated shape win/common)
+            subjectData.pMFbA = var.pMFbA; % model free value transfer (based on last choice of current rated shape win/common)
             subjectData.ratingschange_chosens = ratingschange_chosens;
     
             stayprobTable = [stayprobTable; subjectTable];
             GroupData = [GroupData;subjectData];
-            subjectRatings = subjectData.Rating;
-            allratings = [allratings; subjectRatings];
+            %subjectRatings = subjectData.Rating;
+            %allratings = [allratings; subjectRatings];
            
             clear subjectRatings subjectTable
-            allbarv(i,:)=barv; % barv is the winc/common split of choices
-            allbaraa(i,:)= baraa; %win/common split of shape ratings, chosen not re-seen
+            allbarv(i,:)=var.barv; % barv is the winc/common split of choices
+            allbaraa(i,:)= var.baraa; %win/common split of shape ratings, chosen not re-seen
             
-            allpMB(i,:)=pMB; % accumulare pMB from all subjects
-            allpMF(i,:)= pMF; % accumulate pMF from all subjects
+            allpMB(i,:)=var.pMB; % accumulare pMB from all subjects
+            allpMF(i,:)= var.pMF; % accumulate pMF from all subjects
         elseif group == 4 || group == 5
            [pMB, pMF, pwin, barv, baraa, MBMFD, subjectTable, pMTbA, pMFbA, pMBTPOSA, pMBNEG, ...
             baraaq, ratingschange_chosens] = PDGraphingTR_HC(subjectData, i);
@@ -177,96 +189,149 @@ for group = 5
             HCGroupData = [HCGroupData;subjectData];
             subjectRatings = subjectData.rating;
             allratings = [allratings; subjectRatings];
-            allpMB(i,:)=pMB; % accumulare pMB from all subjects
-            allpMF(i,:)= pMF; % accumulate pMF from all subjects
+            allpMB(i,:)= var.pMB; % accumulare pMB from all subjects
+            allpMF(i,:)= var.pMF; % accumulate pMF from all subjects
 
         end
-
     
-    end
+        vars = struct2table(var, 'AsArray', 1);
+        grp = {getGroupLabel(group)};
+        s = table(i, grp, Med, Dis, nl, age, ami, updrst, hads);
+        ss = [s, vars];
+      
+        shortTable = [shortTable; ss];
+    
+    end % Exits the subject-specific loop
+
+    if GenerateCondPlots ==1;
+    % Fit hybrid learning model
+        if optimize == 1
+            fit = fitWrapper(GroupData, 'LLmodelRating', 1, 1);
+        else 
+            fitall = load('/Users/klarahatinova/Documents/MBDM_2023/Saved_variables/fittedParamCell.mat');
+            fit = fitall.ans{group,1}; clear fitall;
+        end
+        
+            
+        rpeData = [];
+        for subject = 1:length(GroupData)
+            y = [fit.results.paramfit(subject, :)]; % initialise optimised parameters
+            [LL, RPEs] = LLmodelRating_extraction(y, GroupData, subject); % generate RPEs
+            rpeData(subject).subject = RPEs; % save RPE data in rpeData, which has the RPEs a field for every subject
+        end
+    
+        figure; 
+        clear RC RPE4 RPE5 RPE6 RPE2
+        for subject = 1:length(GroupData)
+            RC(:,subject) = GroupData(subject).ratingschange_chosens(:); % get the ratingschange of the chosen shape
+            RPE2(:,subject) = rpeData(subject).subject.RPE2(:);
+            RPE5(:,subject) = rpeData(subject).subject.RPE5(:);
+            RPE6(:,subject) = rpeData(subject).subject.RPE6(:);
+            RPE4(:,subject) = rpeData(subject).subject.RPE4(:);
+           
+            
+            subplot(4,5,subject)
+            [Xb,Yb, p,t, h, resid] = conditionalPlot(RPE4(:,subject), RC(:,subject));
+            title(['RPE4 for Subject ' num2str(subject), ' ',getGroupLabel(group)])
+            hold on;
+            line(0, 0, 'Color', 'k', 'LineStyle', '--');
+            hold off;
+    
+        end
+    
+        %make conditional plots
+        RPEs = {RPE2, RPE4, RPE6, RPE5};
+        plotConditionalSubplots(RPEs, RC, group); 
+        % plots a conditional suplot for the RPEs specified in RPEs
+        % ratingschange(:,subject) - RPE(:,subject)
+    end % exits the if generateCondPlots
+end 
+% exits the group loop
    
     
     % consolidate/organize the extracted data for each group
     allratings_g{group} = allratings;
 
-        save('oHC.mat', 'GroupData');
-
+    if save == 1;
+    save('oHC.mat', 'GroupData');
+    end
 
     
-    if GeneratePlots == 1
-        figure('Name','BoxPlot','Color', 'w', 'Position', [200 200 800 800]);
-        data = [allpMB(:), allpMF(:)]; % Concatenate data into a matrix with each column being a variable
-        
-        % Create boxplot
-        boxplot(data, 'Colors', [colourMap(3,group); colourMap(3,group)], 'BoxStyle','filled');
-        
-        % Customizing the plot
-        set(gca, 'FontSize', 48, 'LineWidth', 5, 'Box', 'off');
-        xticks([1 2]);
-        xticklabels({'MB', 'MF'}); % Replace 'MB' and 'MF' with the appropriate labels
-        xlim([0.5 2.5]);
-        
-        hold off;
+if GeneratePlots == 1
+    figure('Name','BoxPlot','Color', 'w', 'Position', [200 200 800 800]);
+    data = [allpMB(:), allpMF(:)]; % Concatenate data into a matrix with each column being a variable
     
+    % Create boxplot
+    boxplot(data, 'Colors', [colourMap(3,group); colourMap(3,group)], 'BoxStyle','filled');
+    
+    % Customizing the plot
+    set(gca, 'FontSize', 48, 'LineWidth', 5, 'Box', 'off');
+    xticks([1 2]);
+    xticklabels({'MB', 'MF'}); % Replace 'MB' and 'MF' with the appropriate labels
+    xlim([0.5 2.5]);
+    
+    hold off;
+
+    figure('Name','Daw Plot','Color', 'w', 'Position', [200 200 800 800]);
+    errbar1 = nanstd(allpMB)/sqrt(length(allpMB)); %SEM
+    errbar2 = nanstd(allpMF)/sqrt(length(allpMF)); %SEM
+    x = 1:2;
+    barWidth = 0.6;
+
+    hold on;
+    bar(1, nanmean(allpMB), barWidth, 'FaceColor', colourMap(3,group));
+    bar(2, nanmean(allpMF), barWidth, 'FaceColor', colourMap(3,group));
+    set(gca,'FontSize', 48, 'LineWidth', 5, 'Box', 'off')
+    er1 = errorbar(1, nanmean(allpMB), errbar1, -errbar1);
+    er1.Color = [0 0 0]; er1.LineStyle = 'none'; er1.LineWidth = 5;
+    er2 = errorbar(2, nanmean(allpMF), errbar2, -errbar2);
+    er2.Color = [0 0 0]; er2.LineStyle = 'none'; er2.LineWidth = 5;
+    xlim([0.5 2.5]); xticks([1 2]);
+
+    xLabels = ["pMB"  "pMF"]; ylabel('Probability')
+    xticklabels(xLabels);
+    title(getGroupLabel(group));
+    ylim([-0.05 0.30])
+    hold off
+    exportgraphics(gcf,['pMB pMF', getGroupLabel(group), '.pdf'])
+end
+    
+if plotDawGraphs == 1
+  graphTypes = "Classic Daw"; %"Ratings Daw"
+    for idx = 1:length(graphTypes)
         figure('Name','Daw Plot','Color', 'w', 'Position', [200 200 800 800]);
-        errbar1 = nanstd(allpMB)/sqrt(length(allpMB)) %SEM
-        errbar2 = nanstd(allpMF)/sqrt(length(allpMF)) %SEM
-        x = 1:2;
-        barWidth = 0.6;
-    
+        if idx == 1
+            data = allbarv;
+            %ylabel('Stay Probability');
+            ylim([0.5 0.9]);
+        else
+            data = allbaraa;
+            ylabel('Tiedranked Ratings');
+            ylim([0, 250]);
+        end
+        % if group == 1:2
+        %     data(15,:) = nan; % eliminate PD116 participant, as they only chose one colour at s1
+        % else data(7,:) = nan; % eliminate C107, as they also only chose one colour at s1 (save for one trial)
+        % end
+        errbar = nanstd(data)/ sqrt(length(data)); %SEM
+        x = 1:4;
+        barWidth = 0.4;
+
         hold on;
-        bar(1, nanmean(allpMB), barWidth, 'FaceColor', colourMap(3,group));
-        bar(2, nanmean(allpMF), barWidth, 'FaceColor', colourMap(3,group));
+        bar(x([1, 3]), nanmean(data(:,[1, 3])), barWidth, 'FaceColor', "#0072BD");
+        bar(x([2, 4]), nanmean(data(:,[2, 4])), barWidth, 'FaceColor', "#D95319");
         set(gca,'FontSize', 48, 'LineWidth', 5, 'Box', 'off')
-        er1 = errorbar(1, nanmean(allpMB), errbar1, -errbar1);
-        er1.Color = [0 0 0]; er1.LineStyle = 'none'; er1.LineWidth = 5;
-        er2 = errorbar(2, nanmean(allpMF), errbar2, -errbar2);
-        er2.Color = [0 0 0]; er2.LineStyle = 'none'; er2.LineWidth = 5;
-        xlim([0.5 2.5]); xticks([1 2]);
-    
-        xLabels = ["pMB"  "pMF"]; ylabel('Probability')
+        er = errorbar(x, nanmean(data), errbar, -errbar);
+        er.Color = [0 0 0]; er.LineStyle = 'none'; er.LineWidth = 5;
+        xlim([0.5, 4.5]); xticks([1.5 3.5]);
+        
+        xLabels = ["Reward"  "Loss"];
+        %legend({"Common" "Rare"})
         xticklabels(xLabels);
         title(getGroupLabel(group));
-        ylim([-0.05 0.30])
         hold off
-        exportgraphics(gcf,['pMB pMF', getGroupLabel(group), '.pdf'])
-    end
-    
-    if plotDawGraphs == 1
-      graphTypes = "Classic Daw"; %"Ratings Daw"
-        for idx = 1:length(graphTypes)
-            figure('Name','Daw Plot','Color', 'w', 'Position', [200 200 800 800]);
-            if idx == 1
-                data = allbarv;
-                %ylabel('Stay Probability');
-                ylim([0.5 0.9]);
-            else
-                data = allbaraa;
-                ylabel('Tiedranked Ratings');
-                ylim([0, 250]);
-            end
-            % if group == 1:2
-            %     data(15,:) = nan; % eliminate PD116 participant, as they only chose one colour at s1
-            % else data(7,:) = nan; % eliminate C107, as they also only chose one colour at s1 (save for one trial)
-            % end
-            errbar = nanstd(data)/ sqrt(length(data)); %SEM
-            x = 1:4;
-            barWidth = 0.4;
-    
-            hold on;
-            bar(x([1, 3]), nanmean(data(:,[1, 3])), barWidth, 'FaceColor', "#0072BD");
-            bar(x([2, 4]), nanmean(data(:,[2, 4])), barWidth, 'FaceColor', "#D95319");
-            set(gca,'FontSize', 48, 'LineWidth', 5, 'Box', 'off')
-            er = errorbar(x, nanmean(data), errbar, -errbar);
-            er.Color = [0 0 0]; er.LineStyle = 'none'; er.LineWidth = 5;
-            xlim([0.5, 4.5]); xticks([1.5 3.5]);
-            
-            xLabels = ["Reward"  "Loss"];
-            %legend({"Common" "Rare"})
-            xticklabels(xLabels);
-            title(getGroupLabel(group));
-            hold off
-            exportgraphics(gcf,['Daw graph', getGroupLabel(group), 'legend free.pdf'])
-        end
+        exportgraphics(gcf,['Daw graph', getGroupLabel(group), 'legend free.pdf'])
     end
 end
+
+
