@@ -1,34 +1,40 @@
-function [pMB, pMF, pwin, barv, baraa, MBMFD, RatingsTable,...
-    pMTbA, pMFbA, pMBTPOSA, pMBNEG, RTTP, baraaq, ratingschange_chosens] = PDGraphingTR_K(result, sub) 
+function  [var, RatingsTable, ratingschange_chosens] = PDGraphingTR_K(result) 
+ % Adapted to work for the MD young healthy controls when loaded in as pure data files
 
 %% PDGraphingTR 
 c1=[result.A(:,1)]';
-win=[result.R];
-con=[result.trans];
-start = [result.start];
-finish = [result.finish];
+win=[result.R]; % reward (1) or non-reward (0)
+con=[result.trans]; % same as conmap, but transposed    
+start = [result.start]; % start s1
+finish = [result.finish]; % end s1
 tp = [result.ratingIdx]; % 1 to 5, which item probed, also referred to as ratedshape in some scripts
-irrels = [result.shapeIdx]; % 
-conmap=[result.trans]';
-correct =[result.correct]';
-startTP = [result.startTransferChoice];
-endTP = [result.endTransferChoice];
-normratings = [result.Rating]';
+irrels = [result.shapeIdx]; % which s1 shapes were presented (red | blue)
+conmap=[result.trans]'; % common (1) or rare (0)
+correct =[result.correct]'; % should the s2 choice have led to a reward?
+startTP = [result.startTransferChoice]; % start of rating
+endTP = [result.endTransferChoice]; % end of rating
+normratings = [result.zRating]'; % normalised ratings
 SubjectID = result.ID;
-subjectID = repelem(SubjectID, length(c1), 1);
+subjectID = repelem(SubjectID, length(c1), 1); % subjectID for subjectTable
 trial = (1:length(c1))';
-ratings = [result.Rating]';
-medication= repelem(result.Med, length(c1), 1);
+ratings = [result.Rating]'; % normratings
+medication = repelem(result.Med, length(c1), 1);
 disease = repelem(result.Dis, length(c1), 1);
+age = repelem(result.Age, length(c1), 1);
+pd_severity = repelem(result.UPDRST, length(c1), 1);
+motivation = repelem(result.AMI, length(c1), 1);
+depression = repelem(result.HADS, length(c1), 1);
+le = repelem(result.LearningEffect, length(c1), 1);
+nl = result.nl_orientation;
 
 % PDGraphingTR continued
-stick=[nan c1(1:end-1)==c1(2:end)];
+stick=[nan c1(1:end-1)==c1(2:end)]; % did they repeat ths s1 choice?
 nanmean(stick); %prop of trials where response is repeated
-stickwin = [stick == 1 & win == 1];% trials where i stuck and won as 1;
+stickwin = stick == 1 & win == 1;% trials where i stuck and won as 1;
 s=stick(2:end);
-stick = [s NaN]';
+stick = [s NaN]'; % set stick behaviour 2:end as (1:end-1 + NaN)
+var.stick = stick;
 winf=win';
-winn = win';
 winf(isnan(winf))=false;
 conf=con';
 conf(isnan(conf))=false;
@@ -38,50 +44,22 @@ select_mbmf = [
     winf(1:end-1) & conf(1:end-1)==0
     winf(1:end-1)==0 & conf(1:end-1)
     winf(1:end-1)==0 & conf(1:end-1)==0
-    ];
+    ]; % clasifies trials 
 
-nantrial=isnan(winn(1:end-1))|isnan(conmap(1:end-1));
-select_mbmf = (select_mbmf .* ~nantrial)>0;
+winn = win';
+nantrial= isnan(winn(1:end-1))|isnan(conmap(1:end-1));
+var.select_mbmf = (select_mbmf .* ~nantrial)>0; % remove nan trials 
 
 
 barv(1)=nanmean(s(select_mbmf(1,:)));% bar(1) is rewarded and common; 
 barv(2)=nanmean(s(select_mbmf(2,:)));% bar(2) is rewarded and rare
 barv(3)=nanmean(s(select_mbmf(3,:)));% bar(3) is not-rewarded and common;
 barv(4)=nanmean(s(select_mbmf(4,:)));% bar(4) is not-rewarded and rare;
-
+var.barv = barv;
 
 %% Plotting Daw graphs for each participant (now as a subplot)
-    % Ratingschange subplots
-    % subplot(4, 5, SubjectID); % Create a subplot in a 3x6 grid
-    % hold on; 
-    % for i = 1:length(diffr)
-    %     yValues = diffr{i};
-    % 
-    %     if i == 1 || i == 3
-    %         scatterColor = 'blue'; 
-    %     else
-    %         scatterColor = 'red'; 
-    %     end
-    %     % Scatter plot with x-values as the cell index (i) and y-values from the cell
-    %     scatter(i * ones(size(yValues)), yValues, 'filled', 'MarkerFaceColor', scatterColor);
-    % 
-    %     meanValue = nanmean(yValues);
-    %     plot(i, meanValue, '*', 'MarkerSize', 10, 'Color', 'black');
-    % end
-    % hold off;
-    % 
-    % % bar(rats); 
-    % % Customize plot labels and title if needed
-    % ylabel('Ratings Change');
-    % title(['Daw Graph of Ratings Change for Subject ', num2str(SubjectID)]);
-    % sgtitle(['Ratingschange on Trial Types for Group ' num2str(grp)])
-    % %Replace numerical labels with x-labels
-    % conditions = {'R/C', 'R/R', 'NR/C', 'NR/R'};
-    % xticks(1:4);
-    % xticklabels(conditions); xlim([0.5, 4.5]);
-
-    % % Behavioral (Daw) subplots
-    % subplot(4, 5, SubjectID); % Create a subplot in a 3x6 grid
+    % Behavioral (Daw) subplots
+    % subplot(3, 10, SubjectID); % Create a subplot in a 3x6 grid
     % barColors = [1 0 0; 1 0 0; 0 0 1; 0 0 1];
     % bar(barv); 
     % % Customize plot labels and title if needed
@@ -93,18 +71,19 @@ barv(4)=nanmean(s(select_mbmf(4,:)));% bar(4) is not-rewarded and rare;
     % conditions = {'R/C', 'R/R', 'NR/C', 'NR/R'};
     % xticks(1:4);
     % xticklabels(conditions);
+    % ylim([0.4 1.0]);
 
 %measures of MB and MFness of BEHAVIOUR
-pMB = ((barv(1)+barv(4))-(barv(3)+barv(2)));%mb measure win common + lose uncommon - win rare + lose common
-pMBPOS = (barv(1))-(barv(2)); % probability of sticking with a common vs a rare winning s1 choice
-pMBNEG = (barv(4))-(barv(3)); % probability of sticking with a common vs rare losing s1 choice
-pMF = ((barv(1)+barv(2))-(barv(3)+barv(4))); %mf index, total stick after win - total stick after lose
-mbi = pMB - pMF; % mb - mf
-pwin = mean(win); % probability of winning = mean times participant won
+var.pMB = ((barv(1)+barv(4))-(barv(3)+barv(2)));%mb measure win common + lose uncommon - win rare + lose common
+var.pMBPOS = (barv(1))-(barv(2)); % probability of sticking with a common vs a rare winning s1 choice
+var.pMBNEG = (barv(4))-(barv(3)); % probability of sticking with a common vs rare losing s1 choice
+var.pMF = ((barv(1)+barv(2))-(barv(3)+barv(4))); %mf index, total stick after win - total stick after lose
+var.mbi = var.pMB - var.pMF; % mb - mf
+var.pwin = mean(win); % probability of winning = mean times participant won
 
 antic1=abs(c1-3); % 1 to 2 and 2 to 1 = opposite of c1
-RTTP = endTP - startTP; %time taken for rating
-RT = finish - start; % time taken at s1 choice
+var.RTTP = [endTP - startTP]; %time taken for rating
+var.RT = finish - start; % time taken at s1 choice
 
 % initialize variables for Ratings loop
 chosens = nan(length(c1), 1);
@@ -124,12 +103,11 @@ last_rated_distance_chosens = nan(length(c1), 1);
 next_rated_distance_chosens = nan(length(c1), 1);
 last_rated_distance_unchosens = nan(length(c1), 1);
 next_rated_distance_unchosens = nan(length(c1), 1);
-seen_between_unchosen_ratings = nan(length(c1), 1);
 diffratings = nan(length(c1), 1);
 
 
 for i = 1:length(c1) % for each trial
-    if isnan(c1(i)) % if there is no c1, make chosen shapes nan
+    if c1(i) == 0 % if there is no c1, make (un)chosen shapes nan
         chosens(i) = nan;
         unchosens(i) = nan;
     else
@@ -171,21 +149,23 @@ for i = 1:length(c1) % for each trial
         consisucs(i) = nan;
         last_unchosen_distance(i) = nan;
     end 
-   lastseendis (i) = min(last_chosen_distance(i), last_unchosen_distance(i));
+   
+    lastseendis (i) = min(last_chosen_distance(i), last_unchosen_distance(i)); % minimum of last seen chosen/unchosen distance
 
    if ~isempty(last_rated_chosens) && ~isempty(next_rated_chosens)
-       chosen_between = find(chosens(last_rated_chosens:next_rated_chosens) == chosens(i));
+       chosen_between = find(chosens(last_rated_chosens:next_rated_chosens) == chosens(i)); % how many times was the shape chosen between 
        seen_between_chosen_ratings(i) = length(chosen_between) + length(find(unchosens(last_rated_unchosens:next_rated_unchosens) == unchosens(i)));
-       last_rated_distance_chosens(i) = i - (last_rated_chosens);
-       next_rated_distance_chosens(i) = next_rated_chosens - i;
+       last_rated_distance_chosens(i) = i - (last_rated_chosens); % trials from last time the chosen shape was rated
+       next_rated_distance_chosens(i) = next_rated_chosens - i; % trials to next time the chosen shape was rated
         if length(chosen_between) > 5
-          % The shape was chosen more than once between consecutive ratings, skip this trial
+          % If shape was chosen more than 5x between consecutive ratings, skip this trial
            ratingschange_chosens(i) = NaN;
         else 
            ratingschange_chosens(i) = normratings(next_rated_chosens) - normratings(last_rated_chosens);
+           % else the ratingschange is the next - last time rated
         end
    end
-   if ~isempty(last_rated_unchosens) && ~isempty(next_rated_unchosens)
+   if ~isempty(last_rated_unchosens) && ~isempty(next_rated_unchosens) % same as above, but for unchosen shape
        last_rated_distance_unchosens(i) = i - (last_rated_unchosens);
        next_rated_distance_unchosens(i) = next_rated_unchosens - i;
        unchosen_between = find(unchosens(last_rated_unchosens:next_rated_unchosens) == unchosens(i));
@@ -195,16 +175,15 @@ for i = 1:length(c1) % for each trial
 
 end
 RatingsTable = table();
-ami = repelem(result.AMI, length(c1), 1);
-hads = repelem(result.HADS, length(c1), 1);
-updrs = repelem(result.UPDRST, length(c1), 1);
-age = repelem(result.Age, length(c1), 1);
-ratingschange = result.ratingschange_chosens';
-le = repelem(result.LearningEffect, length(c1), 1);
+if isnan(ratings)
+    ratings = repelem(NaN,192,1);
+end
 
-RatingsTable = table(subjectID, trial, medication, disease, le, ami, hads, updrs, age, stick, win, con, chosens, unchosens, tp, ratings, normratings, ratingschange_chosens, ratingschange_unchosens,  ...
+RatingsTable = table(subjectID, trial, le, age, medication, disease, nl, pd_severity, motivation, depression, stick, win, con, chosens, unchosens, tp, ratings, normratings, ratingschange_chosens, ratingschange_unchosens,  ...
     diffratings, woncs, consiscs, wonus, consisucs, last_rated_distance_chosens, next_rated_distance_chosens, last_chosen_distance, last_unchosen_distance, ...
     last_rated_distance_unchosens, next_rated_distance_unchosens, seen_between_chosen_ratings);
+
+%% Note: I haven't really used anything below this.
 
 consistentcs=(consiscs==1); % was the rated shape last chosen on a common trial?
 inconsistentcs=(consiscs==0);
@@ -222,21 +201,23 @@ baraa(1)= nanmean(normratings(woncs==1&consistentcs&(selandnotreseen)));
 baraa(2)= nanmean(normratings(woncs==1&inconsistentcs&(selandnotreseen)));
 baraa(3)= nanmean(normratings(woncs==0&consistentcs&(selandnotreseen)));
 baraa(4)= nanmean(normratings(woncs==0&inconsistentcs&(selandnotreseen)));
-
+var.baraa = baraa;
 
 % calculate diffratings also for this 
 ucbara(1)= nanmean(normratings(wonus==1&consistentucs&(unselandnotreseen)));
 ucbara(2)= nanmean(normratings(wonus==1&inconsistentucs&(unselandnotreseen)));
 ucbara(3)= nanmean(normratings(wonus==0&consistentucs&(unselandnotreseen)));
 ucbara(4)= nanmean(normratings(wonus==0&inconsistentucs&(unselandnotreseen)));
+var.ucbara = ucbara;
 
 currRating(1)= nanmean(normratings(winf==1&conf==1));
 currRating(2)= nanmean(normratings(winf==1&conf==0));
 currRating(3)= nanmean(normratings(winf==0&conf==1));
 currRating(4)= nanmean(normratings(winf==0&conf==0));
+var.currRating = currRating; % The ratings binned by win/common on CURRENT trial
 
-    % Behavioral subplots
-    % subplot(4, 5, sub); % Create a subplot in a 3x6 grid
+    % % Rating subplots
+    % figure; % Create a subplot in a 3x6 grid
     % bar(currRating); 
     % % Customize plot labels and title if needed
     % ylabel('Normrating Trial(i)');
@@ -247,10 +228,10 @@ currRating(4)= nanmean(normratings(winf==0&conf==0));
     % xticks(1:4);
     % xticklabels(conditions);
 
-pMTbA = ((baraa(1)+baraa(4))-(baraa(3)+baraa(2))); %prob of MBT to bara (general conis in conis graphh)
-pMFbA = ((baraa(1)+baraa(2))-(baraa(3)+baraa(4))); % prob of MFT to bara 
-pMBTPOSA = ((baraa(1))-(baraa(2))); %MBT for positive (wins) only 
-pMBTNEGA = ((baraa(4))-(baraa(3))); %MBT for neg only 
+var.pMTbA = ((baraa(1)+baraa(4))-(baraa(3)+baraa(2))); %prob of MBT to bara (general conis in conis graphh)
+var.pMFbA = ((baraa(1)+baraa(2))-(baraa(3)+baraa(4))); % prob of MFT to bara 
+var.pMBTPOSA = ((baraa(1))-(baraa(2))); %MBT for positive (wins) only 
+var.pMBTNEGA = ((baraa(4))-(baraa(3))); %MBT for neg only 
 % figure
 % bar([pMTbA, pMFbA, pMBTPOSA, pMBTNEGA] )
 % ylabel('probability');
@@ -303,6 +284,7 @@ baraaq(30)= nanmean(normratings(woncs==1&inconsistentcs&(select8)&chosennotresee
 baraaq(31)= nanmean(normratings(woncs==0&consistentcs&(select8)&chosennotreseen));
 baraaq(32)= nanmean(normratings(woncs==0&inconsistentcs&(select8)&chosennotreseen));
 errbaraaq = baraaq - mean(baraaq);
+var.baraaq = baraaq;
 
 % MB vs MF decay (MB first MF last)
 MBMFD(1)=((baraaq(1)+baraaq(4))-(baraaq(3)+baraaq(2)));
@@ -321,6 +303,7 @@ MBMFD(14)=((baraaq(17)+baraaq(18))-(baraaq(19)+baraaq(20)));
 MBMFD(15)=((baraaq(21)+baraaq(22))-(baraaq(23)+baraaq(24)));
 MBMFD(16)=((baraaq(25)+baraaq(26))-(baraaq(27)+baraaq(28)));
 MBMFD(17)=((baraaq(29)+baraaq(30))-(baraaq(31)+baraaq(32)));
+var.MBMFD = MBMFD;
 
 % Adding cutoff of 5 as "proximate" chosen trials, anything over as "distal"
 select1 = last_chosen_distance<5;
@@ -335,5 +318,6 @@ baraaqa(6)= nanmean(normratings(woncs==1&inconsistentcs&(select2)&chosennotresee
 baraaqa(7)= nanmean(normratings(woncs==0&consistentcs&(select2)&chosennotreseen));
 baraaqa(8)= nanmean(normratings(woncs==0&inconsistentcs&(select2)&chosennotreseen));
 errbaraaqa = baraaqa - mean(baraaqa);
+var.baraaqa = baraaqa;
 
 end
