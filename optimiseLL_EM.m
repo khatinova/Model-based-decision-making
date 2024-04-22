@@ -1,11 +1,11 @@
-function [Result,param] = optimiseLL_EM(likfun, param, data,nStarts,nsub,parallel,prior)
+function [Result,param] = optimiseLL_EM_april(likfun,param,data,nStarts,nsub,parallel,prior)
         
     % initialization
-    tol = 1e-3;
+    tol = 0.01;
     maxiter = 20;
     iter = 0;
 
-    K = length(param);  % Number of parameters
+    K = length(param);  % Number of parameters 
     S = length(data);   % Number of subjects
 
     if nargin == 7
@@ -38,13 +38,16 @@ function [Result,param] = optimiseLL_EM(likfun, param, data,nStarts,nsub,paralle
         if parallel == 1
              Result = optimiseLL_parallel(likfun, param, data,nStarts,nsub);
         else
-            Result = optimiseLL(likfun, param, data,nStarts,nsub);
+            disp('entering optimiseLL as part of optimiseLL_EM')
+            Result = optimiseLL_april(likfun, param, data,nStarts,nsub); % data is still the full group data
         end
+
         
         % M-step: update group-level parameters
         v = zeros(1,K);
         for s = 1:S
-            v = v + Result.paramfit(s,:).^2 + diag(pinv(Result.H{s}))';
+            v = v + Result.paramfit(s,:).^2 ...
+            + diag(pinv(Result.H{s}))'; %tests variance of parameters
             try
                 h = logdet(Result.H{s},'chol');
                 L(s) = Result.logpost(s) + 0.5*(Result.K*log(2*pi) - h);
@@ -77,7 +80,7 @@ function [Result,param] = optimiseLL_EM(likfun, param, data,nStarts,nsub,paralle
         Result.group.v = v;
         Result.lme = lme;
         Result.goodHessian = goodHessian;        
-        
+        disp(Result)
         
         if iter > 1 && abs(lme(iter)-lme(iter-1))<tol
             break;
