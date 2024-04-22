@@ -1,29 +1,33 @@
-function Result = optimiseLL(likfun, param, data,nStarts,nsub)
+function Result = optimiseLL_april(likfun, param, data,nStarts,nsub)
 
-options = optimoptions('fminunc', 'Display', 'off', 'MaxFunEvals', 2000, 'SpecifyObjectiveGradient', true);
-
+options = optimset('Display','off','MaxFunEvals',2000);
 warning off all
 
     for sub = 1:nsub
         
         disp(['Subject ',num2str(sub)]);
-
+        subjectdata = data(sub);
+        
         % construct posterior function
-        fpost = @(x) -likfun_post(x,param,data(sub),likfun);
+        fpost = @(x) -likfun_post(x,param,subjectdata,likfun);
 
         K = length(param);  % Number of parameters
 
         for n = 1:nStarts
             success = 0;
-            x0 =  randn(1,K); %[[1.5 0.9 0.1 -0.2 1 1 0.2]'+.2*randn(7,1)]'
-%             while ~success
-%                 try
+            p = [2.36,0.03,0.59,0.05,0.15]; 
+            while ~success
+                try
+                    logp = fpost(x0);
+                    stdDev = 0.1; % Standard deviation of the noise
+                    x0 = p + stdDev .* randn(size(p));
+                    
                     [x,nlogp,exFlag,~,~,H] = fminunc(fpost,x0,options);
-%                     success = 1;
-%                 catch 
-%                     x0 = randn(1,K);
-%                 end
-%             end
+                    success = 1;
+                catch 
+                    x0 = p .*rand(1,K);
+                end
+            end
             
             logp = -nlogp;
             if n == 1 || Result.logpost(sub,1) < logp
@@ -46,5 +50,3 @@ warning off all
         end
     end
 end
-
-
