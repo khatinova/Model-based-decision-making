@@ -5,7 +5,7 @@ function logp = likfun_post(x,param,data,likfun)
     % USAGE: logp = likfun_post(x,param,data,likfun)
     %
     % INPUTS:
-    %   x - parameter values
+    %   x - parameter values (in the original LLmodelrating (ie likfun) x is referred to as y = free parameters)
     %   param - parameter structure
     %   data - data structure
     %   likfun - function handle for likelihood function
