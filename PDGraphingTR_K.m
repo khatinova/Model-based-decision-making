@@ -1,4 +1,4 @@
-function  [var, RatingsTable, ratingschange_chosens] = PDGraphingTR_K(result) 
+function  [var, RatingsTable, ratingschange_chosens] = PDGraphingTR_K(result, group) 
  % Adapted to work for the MD young healthy controls when loaded in as pure data files
 
 %% PDGraphingTR 
@@ -13,11 +13,11 @@ conmap=[result.trans]'; % common (1) or rare (0)
 correct =[result.correct]'; % should the s2 choice have led to a reward?
 startTP = [result.startTransferChoice]; % start of rating
 endTP = [result.endTransferChoice]; % end of rating
-normratings = [result.zRating]'; % normalised ratings
+normratings = [result.zRating]; % normalised ratings
 SubjectID = result.ID;
 subjectID = repelem(SubjectID, length(c1), 1); % subjectID for subjectTable
 trial = (1:length(c1))';
-ratings = [result.Rating]'; % normratings
+ratings = [result.Rating]; % normratings
 medication = repelem(result.Med, length(c1), 1);
 disease = repelem(result.Dis, length(c1), 1);
 age = repelem(result.Age, length(c1), 1);
@@ -26,6 +26,7 @@ motivation = repelem(result.AMI, length(c1), 1);
 depression = repelem(result.HADS, length(c1), 1);
 le = repelem(result.LearningEffect, length(c1), 1);
 nl = result.nl_orientation;
+Screen = result.ScreenSize;
 
 % PDGraphingTR continued
 stick=[nan c1(1:end-1)==c1(2:end)]; % did they repeat ths s1 choice?
@@ -178,8 +179,10 @@ RatingsTable = table();
 if isnan(ratings)
     ratings = repelem(NaN,192,1);
 end
+groupLabel = cellstr(getGroupLabel(group));
+group = repelem(groupLabel,192,1);
 
-RatingsTable = table(subjectID, trial, le, age, medication, disease, nl, pd_severity, motivation, depression, stick, win, con, chosens, unchosens, tp, ratings, normratings, ratingschange_chosens, ratingschange_unchosens,  ...
+RatingsTable = table(subjectID, group, Screen, trial, le, age, medication, disease, nl, pd_severity, motivation, depression, stick, win, con, chosens, unchosens, tp, ratings, normratings, ratingschange_chosens, ratingschange_unchosens,  ...
     diffratings, woncs, consiscs, wonus, consisucs, last_rated_distance_chosens, next_rated_distance_chosens, last_chosen_distance, last_unchosen_distance, ...
     last_rated_distance_unchosens, next_rated_distance_unchosens, seen_between_chosen_ratings);
 
