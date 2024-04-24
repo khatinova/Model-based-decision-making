@@ -1,0 +1,19 @@
+%% assess clinical variables
+
+PD = readtable("PKD_data/Cleaned_demongraphic_PD.xlsx");
+PD(15,:) = [];
+sPD = summary(PD);
+HC = readtable("PKD_data/Cleaned_demongraphic_oHC.xlsx");
+HC(7,:) = [];
+sHC = summary(HC);
+
+%% T-test stats for the clinical variables
+[h,pAMI] = ttest2(HC.AMITotal, PD.AMITotal);
+[h,pHADS] = ttest2(HC.HADSTotal, PD.HADSTotal);
+[h,pGrit] = ttest2(HC.GritTotal, PD.GritTotal);
+[h,pSUPPSP] = ttest2(HC.S_UPPSP, PD.S_UPPSP);
+[h,pAge] = ttest2(HC.Age, PD.Age);
+[h,pAMIB] = ttest2(HC.AMIBehaviour, PD.AMIBehaviour);
+[h,pAMIS] = ttest2(HC.AMISocial, PD.AMISocial);
+[h,pAMIE] = ttest2(HC.AMIEmotional, PD.AMIEmotional);
+[h,pALE] = ttest2(HC.AgeLeavingFullTimeEduction, PD.AgeLeavingFullTimeEduction);
