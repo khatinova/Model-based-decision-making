@@ -24,6 +24,8 @@ age = repelem(result.Age, length(c1), 1);
 pd_severity = repelem(result.UPDRST, length(c1), 1);
 motivation = repelem(result.AMI, length(c1), 1);
 depression = repelem(result.HADS, length(c1), 1);
+grit = repelem(result.Grit, length(c1), 1);
+impulsivity = repelem(result.Impulsivity, length(c1), 1);
 le = repelem(result.LearningEffect, length(c1), 1);
 nl = result.nl_orientation;
 Screen = result.ScreenSize;
@@ -105,6 +107,10 @@ next_rated_distance_chosens = nan(length(c1), 1);
 last_rated_distance_unchosens = nan(length(c1), 1);
 next_rated_distance_unchosens = nan(length(c1), 1);
 diffratings = nan(length(c1), 1);
+lastseentrial = nan(length(c1), 1);
+win_lastseen = nan(length(c1), 1);
+con_lastseen = nan(length(c1), 1);
+selected = nan(length(c1), 1);
 
 
 for i = 1:length(c1) % for each trial
@@ -124,7 +130,6 @@ for i = 1:length(c1) % for each trial
     next_rated_chosens = find(tp(i+1:end) == chosens(i), 1, 'first') + i;
     last_rated_unchosens = find(tp(1:i-1) == unchosens(i), 1, 'last');
     next_rated_unchosens = find(tp(i+1:end) == unchosens(i), 1, 'first') + i;
-
     if ~isempty(lastcs_ratedshape) %if the chosen shape was chosen before this trial   
         woncs(i) = win(lastcs_ratedshape); % was the chosen shape rewarded in the last trial it was selected
         consiscs(i) = conmap(lastcs_ratedshape); % last time chosen shape was selected, was it a consistent trial?
@@ -151,7 +156,21 @@ for i = 1:length(c1) % for each trial
         last_unchosen_distance(i) = nan;
     end 
    
-    lastseendis (i) = min(last_chosen_distance(i), last_unchosen_distance(i)); % minimum of last seen chosen/unchosen distance
+    %% Code to determine last seen chosen/unchosen, win/nonwin, con/incon
+    lastseendis (i) = min(last_chosen_distance(i), last_unchosen_distance(i)); 
+    % number of trials since last seen chosen/unchosen distance
+    lastseentrial(i) = i - lastseendis(i);
+    % trial number on which it was last seen
+    if last_chosen_distance(i) > last_unchosen_distance(i)
+       selected(i) = 1; % last time it was seen, was it chosen?
+    else selected(i) = 0; % was it unchosen?
+    end
+    if ~isnan(lastseentrial(i))
+        win_lastseen(i) = win(lastseentrial(i)); 
+        % last time it was seen, did it lead to a win? (regardless of it if was chosen or not)
+        con_lastseen(i) = con(lastseentrial(i));
+        % last time it was seen, did it lead to a consistent trial? (regardless of it if was chosen or not)
+    end
 
    if ~isempty(last_rated_chosens) && ~isempty(next_rated_chosens)
        chosen_between = find(chosens(last_rated_chosens:next_rated_chosens) == chosens(i)); % how many times was the shape chosen between 
@@ -182,8 +201,8 @@ end
 groupLabel = cellstr(getGroupLabel(group));
 group = repelem(groupLabel,192,1);
 
-RatingsTable = table(subjectID, group, Screen, trial, le, age, medication, disease, nl, pd_severity, motivation, depression, stick, win, con, chosens, unchosens, tp, ratings, normratings, ratingschange_chosens, ratingschange_unchosens,  ...
-    diffratings, woncs, consiscs, wonus, consisucs, last_rated_distance_chosens, next_rated_distance_chosens, last_chosen_distance, last_unchosen_distance, ...
+RatingsTable = table(subjectID, group, Screen, trial, le, age, medication, disease, nl, pd_severity, motivation, depression, grit, impulsivity, stick, win, con, chosens, unchosens, tp, ratings, normratings, ratingschange_chosens, ratingschange_unchosens,  ...
+    diffratings, woncs, consiscs, wonus, consisucs, lastseendis, selected, win_lastseen, con_lastseen, last_rated_distance_chosens, next_rated_distance_chosens, last_chosen_distance, last_unchosen_distance, ...
     last_rated_distance_unchosens, next_rated_distance_unchosens, seen_between_chosen_ratings);
 
 %% Note: I haven't really used anything below this.
