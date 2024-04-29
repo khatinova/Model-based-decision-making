@@ -1,0 +1,7 @@
+%output = AnalyseBehaviour(1,0)
+
+for group = 1:3
+    [output] = AnalyseBehaviour_K(group,1);
+    % group determines the group data that is used
+    % 1 or 0 determines if you make plots or not
+end
