@@ -1,0 +1,295 @@
+% Model-implemmenting script
+warning off
+options.GenerateSurrData = 0;
+options.fitRegression = 1;
+options.GenerateCondPlots = 1;
+
+allSubjectsTable = []; % subject table that will accumulate the RPEs and choice values 
+for group = 1:3
+    if group == 1 % pd off
+        load('groupData_group1.mat');
+        data = GroupData;
+    elseif group == 2 % pd on
+        load('groupData_group2.mat');
+        data = GroupData;
+    elseif group ==3 % controls
+        load('groupData_group3.mat');
+        data = GroupData;
+    end
+    
+    load('fit_all.mat')
+    fit = fit_all{group}; 
+    
+    % Generate surrogate data
+    if options.GenerateSurrData == 1
+        SurrogateData = generateSurrData_K(data,fit.results.paramfit,'LLmodelRating_K'); 
+        FileName = sprintf("SurrData_Group%d", group);
+        save(FileName, "SurrogateData");
+    else 
+        load(sprintf('SurrData_Group%d.mat', group));   
+    end
+    
+    rpeData = [];
+    for subject = 1:length(fit.RealData)
+        y = [fit.results.paramfit(subject, :)];
+        [LL, RPEs] = LLmodelRating_extraction(y, data, subject);
+        rpeData(subject).subject = RPEs;
+    end
+
+    if options.fitRegression == 1                                                                                                                                                                                
+        regressions{group} = fitRegression_April(SurrogateData, data, group);
+        
+        %[SurrogateRegression, SurrRPEmatrix] = fitRegression_dsurr(SurrogateData, R, group);
+    end
+        
+    if options.GenerateCondPlots ==1        
+        rpeData = [];
+        for subject = 1:length(GroupData)
+            y = [fit.results.paramfit(subject, :)]; % initialise optimised parameters
+            [LL, RPEs] = LLmodelRating_extraction(y, GroupData, subject); % generate RPEs
+             
+            % Convert the current subject's RPEs structure to a table
+             currentSubjectTable = struct2table(RPEs);
+             allSubjectsTable = [allSubjectsTable; currentSubjectTable];
+            
+            rpeData(subject).subject = RPEs; % save RPE data in rpeData, which has the RPEs a field for every subject
+            
+        end
+    
+        figure('Name','Condplots for all subjects', 'Position',[100 100 1000 800]); 
+        clear RC RPE4 RPE5 RPE6 RPE2
+
+        for subject = 1:length(data)
+
+            RC(:,subject) = data(subject).ratingschange_chosens(:); % get the ratingschange of the chosen shape
+            RPE2(:,subject) = rpeData(subject).subject.RPE2(:);
+            RPE5(:,subject) = rpeData(subject).subject.RPE5(:);
+            RPE6(:,subject) = rpeData(subject).subject.RPE6(:);
+            RPE4(:,subject) = rpeData(subject).subject.RPE4(:);
+            RPE7(:,subject) = rpeData(subject).subject.RPE7(:);
+            RPE8(:,subject) = rpeData(subject).subject.RPE8(:);
+
+            RPE8_all{subject,group} = rpeData(subject).subject.RPE8(:); % also collect the RPE data for a single graph of all 3 grps
+            RPE7_all{subject,group} = rpeData(subject).subject.RPE7(:);
+            RCall{subject,group} = data(subject).ratingschange_chosens(:); % same for ratingschange
+            
+            % [Xb,Yb, p, t, h, resid ] = conditionalPlot(RPE8_all,Y);
+            % 
+            % 
+            % [Xb,Yb, p, t, h, resid ] = conditionalPlot(RPE7_all,Y);
+        end
+
+        %make conditional plots
+        RPEs = {RPE2, RPE4, RPE6, RPE5}; % makes an array of RPEs that I want to regress against ratingschange
+        plotConditionalSubplots(RPEs, RC, group); 
+        % plots a conditional suplot for the RPEs specified in RPEs
+        % Structure of data: ratingschange(:,subject) - RPE(:,subject)
+
+    end % exits the if generateCondPlots
+end
+
+
+%stayprobTable = [stayprobTable, allSubjectsTable];
+TWcontrols = stayprobTable((stayprobTable.disease == 0),:);
+TWpdon = stayprobTable((stayprobTable.medication == 1),:);
+TWpdoff = stayprobTable((stayprobTable.medication == 0 & stayprobTable.disease == 1),:);
+TWpd = stayprobTable((stayprobTable.disease == 1),:);
+%% Pipeline for establishing the best fitting RPE
+models = struct();
+rpeNames = {'RPE1', 'RPE2', 'RPE3', 'RPE4', 'RPE5', 'RPE6', 'RPE7', 'RPE8', 'RPE9', 'RPE10', 'RPE11'}; % Your list of RPEs
+% accumulate the linear models in models structure
+for i = 1:length(rpeNames)
+    formula = ['ratingschange_chosens ~ ' rpeNames{i} ' + (1|subjectID)']; % Construct a formula string
+    models.(rpeNames{i}) = fitlme(stayprobTable, formula);
+end
+
+aicValues = zeros(length(rpeNames), 1);
+bicValues = zeros(length(rpeNames), 1);
+
+for i = 1:length(rpeNames)
+    aicValues(i) = models.(rpeNames{i}).ModelCriterion.AIC;
+    bicValues(i) = models.(rpeNames{i}).ModelCriterion.BIC;
+    LL(i) = models.(rpeNames{i}).LogLikelihood;
+end
+
+% Find the model with the minimum AIC and BIC
+[minAIC, idxAIC] = min(aicValues);
+[minBIC, idxBIC] = min(bicValues);
+[minLL, idxLL] = min(LL);
+
+bestModelAIC = rpeNames{idxAIC};
+bestModelBIC = rpeNames{idxBIC};
+bestModelLL = rpeNames{idxLL};
+
+%% determine the best fitting RPE for every group indidvidually
+for i = 1:length(rpeNames)
+    formula = ['ratingschange_chosens ~ ' rpeNames{i} ' + (1|subjectID)']; % Construct a formula string
+    %models.(rpeNames{i}) = 
+    fitlme(TWcontrols, formula)
+    % to study a different group, just change the sub-table used:
+    % TWcontrols, TWpdon, TWpdoff
+end
+
+% determine the best fit
+aicValues = zeros(length(rpeNames), 1);
+bicValues = zeros(length(rpeNames), 1);
+for i = 1:length(rpeNames)
+    aicValues(i) = models.(rpeNames{i}).ModelCriterion.AIC;
+    bicValues(i) = models.(rpeNames{i}).ModelCriterion.BIC;
+    LL(i) = models.(rpeNames{i}).LogLikelihood;
+end
+
+% Find the model with the minimum AIC and BIC
+[minAIC, idxAIC] = min(aicValues);
+[minBIC, idxBIC] = min(bicValues);
+[minLL, idxLL] = min(LL);
+
+bestModelAIC = rpeNames{idxAIC};
+bestModelBIC = rpeNames{idxBIC};
+bestModelLL = rpeNames{idxLL};
+
+%% Now to plot the best RPE for each group
+% for controls
+clear g X Y Z
+X = TWcontrols.trial;
+Y = TWcontrols.normratings;
+Z = categorical(TWcontrols.subjectID-18);
+
+% Create a gramm object
+g = gramm('x', X, 'y', Y, 'group', Z, 'color', Z);
+
+% Add jittered points to the plot for better visualization
+%g.geom_jitter('width', 0.1, 'height', 0);
+
+% Add summary statistics: bars for CI and horizontal line for mean
+%g.stat_summary('type',  'sem', 'geom', {'line', 'black_errorbar'});  % CI and bars
+g.stat_glm('geom', 'line', 'fullrange', 1, 'disp_fit', 0);
+g.geom_hline('yintercept', 0, 'style', 'k--');  % 'k--' indicates a black dashed line
+
+% Set plot titles and labels
+g.set_title('Effect of RPE 8', 'FontSize', 36);
+g.set_names('x', 'RPE 8', 'y', 'Ratingschange Chosen Shape', 'color', 'Subject');
+
+% Draw the plot in a new figure window
+figure('Position', [100 100 800 600]);
+g.draw();
+% Optionally, adjust additional text properties if needed after drawing
+set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
+
+
+%% RPE vs  RC regressions
+% Assuming X is your 192x6 matrix and Y is your output vector
+n = size(X, 1);
+cols = size(X, 2);
+X_long = reshape(X, [n*cols, 1]); % Convert X to a long vector
+Y_long = repmat(Y, [cols, 1]); % Repeat Y for each column of X
+group = repelem(1:cols, n)'; % Create a grouping variable for each column
+
+% Initialize the gramm object
+g = gramm('x', X_long, 'y', Y_long, 'color', group);
+g.geom_point();  % Add points
+g.stat_glm();    % Perform and plot the results of a linear regression for each group
+
+% Set names and labels
+g.set_names('x', 'Predictor Value', 'y', 'Output', 'color', 'Predictor ID');
+g.set_title('Linear Model for Each Predictor');
+
+% Draw the plot
+figure('Position', [100 100 800 600]); % Set figure size
+g.draw();
+
+
+
+
+%% Add the parameters to my results tables
+%parameters = table(fit_all{1,1}.results.paramfit; fit_all{1,2}.results.paramfit; fit_all{1,3}.results.paramfit);
+% transform the parameters into non-gaussian parameters
+for i = 1:3
+    fit = fit_all{i};
+    fit.results.boundparam(:, [1,5]) = exp(fit.results.paramfit(:, [1,5]));
+    fit.results.boundparam(:, [2,3,4]) = 1./(1+exp(-fit.results.paramfit(:,[2,3,4])));
+    fit_all{i} = fit;
+end
+
+boundparameters = [fit_all{1,1}.results.boundparam(:,:); fit_all{1,2}.results.boundparam(:,:); fit_all{1,3}.results.boundparam(:,:)]
+boundTable = table(boundparameters(:,1), boundparameters(:,2), boundparameters(:,3), ...
+    boundparameters(:,4), boundparameters(:,5), ...
+    'VariableNames', {'Beta', 'Alpha', 'Lambda', 'Omega', 'Pi'});
+shortTable = [shortTable,boundTable]
+
+%% Make boxplots showing the distributions of paramters
+figure('Position', [100 100 1000 800]);
+for group = 1:3
+    subplot(1,3,group)
+    boxplot(fit_all{1, group}.results.paramfit, 'Colors',colourMap(3,group))
+    title([getGroupLabel(group) 'fitted parameters']); 
+    ylabel('Parameter Value')
+    xticks(1:5);
+    xticklabels({'beta' 'alpha' 'lambda' 'omega' 'pi'}); ylim([-5.5 4]);
+end
+set(findall(gcf, '-property', 'FontSize'), 'FontSize', 24);
+
+figure('Position', [100 100 1000 800]);
+for group = 1:3
+    subplot(1,3,group)
+    boxplot(fit_all{1, group}.results.boundparam, 'Colors',colourMap(3,group))
+    title([getGroupLabel(group) ' bound parameters']); 
+    ylabel('Parameter Value')
+    xticks(1:5);
+    xticklabels({'beta' 'alpha' 'lambda' 'omega' 'pi'})
+    set(gca, 'YScale', 'log');
+end
+set(findall(gcf, '-property', 'FontSize'), 'FontSize', 24);
+
+% Plot the parameters by parameter, all three groups on one
+params = {'Beta', 'Alpha', 'Lambda', 'Omega', 'Pi'};
+figure('Position', [100,100,1600,600])
+for param = 1:5
+    subplot(1,5,param);
+    % Collect data from each group for the current parameter
+    data = [];
+    groups = [];
+    for group = 1:3
+        % Append data for current parameter
+        data = [data; fit_all{1, group}.results.paramfit(:, param)];
+        % Create a corresponding group vector
+        groups = [groups; repmat(group, size(fit_all{1, group}.results.paramfit(:, param), 1), 1)];
+    end
+    % Create a boxplot for the collected data
+    boxplot(data, groups, 'Colors', colourMap(3, groups));  % Ensure colourMap generates the correct color array
+    hold on;
+    ylabel('Parameter Value');
+    title(params{param});
+    xticks(1:3);
+    xticklabels({'PD off', 'PD on', 'Controls'});    
+    hold off;
+end
+set(findall(gcf, '-property', 'FontSize'), 'FontSize', 24);
+
+
+% For the bound parameters
+figure('Position', [100,100,1600,600])
+for param = 1:5
+    subplot(1,5,param);
+    % Collect data from each group for the current parameter
+    data = [];
+    groups = [];
+    for group = 1:3
+        % Append data for current parameter
+        data = [data; fit_all{1, group}.results.boundparam(:, param)];
+        % Create a corresponding group vector
+        groups = [groups; repmat(group, size(fit_all{1, group}.results.boundparam(:, param), 1), 1)];
+    end
+    % Create a boxplot for the collected data
+    boxplot(data, groups, 'Colors', colourMap(3, groups), 'Symbol', "diamond");  % Ensure colourMap generates the correct color array
+    hold on;
+    ylabel('Parameter Value');
+    title(params{param});
+    
+    xticks(1:3);
+    xticklabels({'PD off', 'PD on', 'Controls'});    
+    hold off;
+    if param == 2 || param == 3 || param == 4 ; ylim([0 1]); end
+
+end
+set(findall(gcf, '-property', 'FontSize'), 'FontSize', 24); 
