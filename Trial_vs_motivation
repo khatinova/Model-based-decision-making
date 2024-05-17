@@ -1,0 +1,108 @@
+% pd off random effects of trial
+Tpdoff = fitlme(TWpdoff, 'normratings ~ win + trial + (trial|subjectID)')
+[~,~,OFFstats] = randomEffects(Tpdoff);
+Trial_estimates{2} = OFFstats(2:2:end,:);
+
+% pd on random effects of trial
+Tpdon = fitlme(TWpdon, 'normratings ~ win + trial + (trial|subjectID)')
+[~,~,ONstats] = randomEffects(Tpdon);
+Trial_estimates{1} = ONstats(2:2:end,:);
+
+% controls random effect of trial 
+Tcontrols = fitlme(TWcontrols, 'normratings ~ win + trial + (trial|subjectID)')
+[~,~,Cstats] = randomEffects(Tcontrols);
+Trial_estimates{3} = Cstats(2:2:end,:);
+
+column = []
+for i = 1:3 
+    column = [column; Trial_estimates{i}(:,4)];
+end 
+dataset2struct(column) % follow by copy past the structure into a new column 
+shortTable.trial_RE = ans
+
+for subject = 1:height(shortTable)
+    shortTable.i(subject) = subject;
+end
+
+
+
+TTable = load("shortTable_FINAL.mat");
+
+%% Clinical Variable figures
+X = shortTable.ami;
+Y = shortTable.trial_RE;
+Z = shortTable.grp;
+W = shortTable.i; 
+
+g = gramm('x', X, 'y', Y, 'color', Z, 'group', Z);
+g.geom_point(); 
+% Add a dashed horizontal line at y = 0
+g.geom_hline('yintercept', 0, 'style', 'k--');  % 'k--' indicates a black dashed line
+
+% Add summary statistics or glms
+%g.stat_summary(); % CI and mean as a bar and error bar
+
+% Set plot titles and labels with specific font sizes & adapt point size
+g.set_title('Motivation Effect on Trial (per subject)', 'FontSize', 36);
+g.set_names('x', ' AMI Score ', 'y', 'Random Effect of Trial', 'color', 'Group');
+g.set_point_options('base_size', 10); g.set_line_options('base_size', 5)
+g.set_layout_options('legend', 1)
+
+% Draw the plot
+figure('Position', [100 100 800 800]); % Creates a figure window
+g.draw();
+set(findall(gcf, '-property', 'FontSize'), 'FontSize', 24);
+
+exportgraphics(gcf, "Clinical_Figures/Impulsivity_pMBT_gramm.jpg")
+
+%% Clinical Variable figures
+for t = 1:192
+    m(t) = mean(TWcontrols.normratings(TWcontrols.trial == t));
+end
+plot(m)
+
+group = TWcontrols.motivation < median(TWcontrols.motivation);
+for t = 1:192
+    m1(t) = mean(TWcontrols.normratings((TWcontrols.trial == t) & group));
+    m2(t) = mean(TWcontrols.normratings((TWcontrols.trial == t) & ~group));
+    
+end
+plot(m1)
+hold on
+plot(m2)
+hold off
+
+%% High and low motivation in controls, plots
+%motivated people start off lower, but for every trial motivated people
+%increase ratings by .007
+
+trial_motivation_C = fitlme(TWcontrols, 'normratings ~ trial*motivation*nl + (1|subjectID)');
+group = TWcontrols.motivation < median(TWcontrols.motivation);
+conditionalPlot(TWcontrols.trial(group), TWcontrols.normratings(group), [], 'color', 'r')
+hold on
+conditionalPlot(TWcontrols.trial(~group), TWcontrols.normratings(~group), [], 'color', 'b')
+hold off
+xlabel('Trial')
+ylabel('Tiedrankedratings')
+legend({'Less motivated', "", 'More motivated', ""})
+title('Controls')
+
+
+%% Effect of motivation on PD
+
+group = TWpd.motivation < median(TWpd.motivation);
+med = TWpd.medication == 1;
+
+trial_motivation_PD = fitlme(TWpd, 'normratings ~ trial*motivation*medication + (1|subjectID)');
+% three eay interaction indicates that  apathetic patients
+% when off reduce their ratings, but the drug prevents this
+conditionalPlot(TWpd.trial(group & med), TWpd.normratings(group & med), [], 'color', 'r')
+hold on
+conditionalPlot(TWpd.trial(~group & med), TWpd.normratings(~group & med), [], 'color', 'b')
+conditionalPlot(TWpd.trial(group & ~med), TWpd.normratings(group & ~med), [], 'color', 'g')
+conditionalPlot(TWpd.trial(~group & ~med), TWpd.normratings(~group & ~med), [], 'color', 'y')
+hold off
+xlabel('Trial')
+ylabel('Tiedrankedratings')
+legend({'Less motivated ON',"", 'More motivated ON', "",'Less motivated OFF',"", 'More motivated OFF', ""})
+title('PD')
